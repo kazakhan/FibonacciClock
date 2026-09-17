@@ -6,15 +6,6 @@ project uses [Semantic Versioning](https://semver.org/).
 
 Entries are newest-first. Previous entries are never modified.
 
-## [1.2.1] - 2026-09-17
-
-### Added
-- **LICENSE**: the project is now released under the **GNU General Public
-  License v2.0 (GPL-2.0)**.
-
-### Changed
-- README: added a License section and clarified the credits.
-
 ## [1.2.0] - 2026-09-17
 
 ### Added
