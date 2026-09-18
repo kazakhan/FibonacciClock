@@ -10,25 +10,20 @@
 #include "settings.h"
 #include "clock.h"
 
-// Own WiFi management. We deliberately never run AP+STA at the same time: the
-// ESP8266 lwIP stack is unstable in mixed mode. On boot we try the saved
-// network (pure STA); if that fails we fall back to a setup AP with a captive
-// portal, so the clock's web UI is always reachable.
+// Own WiFi management: connect with saved credentials, otherwise start an
+// access point (with a captive-portal DNS) so the clock's web UI is always
+// reachable. No WiFiManager portal — our own server owns port 80.
 
 static DNSServer dnsServer;
 static bool apActive = false;
 static unsigned long lastReconnectAt = 0;
 
-#define WIFI_CONNECT_TIMEOUT_MS 25000UL   // normally ~3s; generous for a weak signal
-#define WIFI_RETRY_MS 60000UL             // start the setup AP if still not connected
-
-static bool wifiOnline() {
-  return WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0);
-}
+#define WIFI_CONNECT_TIMEOUT_MS 15000UL
+#define WIFI_RETRY_MS 30000UL
 
 static void wifiStartAp() {
   if (apActive) return;
-  WiFi.mode(WIFI_AP);
+  if (WiFi.getMode() != WIFI_AP_STA) WiFi.mode(WIFI_AP);
   WiFi.softAP(AP_NAME);
   delay(100);
   dnsServer.start(53, "*", WiFi.softAPIP());
@@ -42,32 +37,23 @@ static void wifiStopAp() {
   dnsServer.stop();
   WiFi.softAPdisconnect(true);
   apActive = false;
+  WiFi.mode(WIFI_STA);
   Serial.println("[wifi] AP stopped");
 }
 
 static bool wifiConnectBlocking(uint32_t timeoutMs) {
   if (settings.wifiSsid[0] == 0) return false;
-  WiFi.persistent(false);
-#ifdef ESP8266
-  WiFi.setSleepMode(WIFI_NONE_SLEEP);
-  WiFi.setOutputPower(20.5);
-#endif
   WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  delay(100);
   WiFi.begin(settings.wifiSsid, settings.wifiPass);
-  WiFi.setAutoReconnect(true);
   unsigned long start = millis();
-  while (!wifiOnline() && (millis() - start) < timeoutMs) {
+  while (WiFi.status() != WL_CONNECTED && (millis() - start) < timeoutMs) {
     delay(200);
     yield();
   }
-  Serial.printf("[wifi] connect took %lus\n", (millis() - start) / 1000);
-  return wifiOnline();
+  return WiFi.status() == WL_CONNECTED;
 }
 
 static void wifiBegin() {
-  WiFi.persistent(false);
   if (settings.wifiSsid[0]) {
     Serial.printf("[wifi] connecting to '%s'...\n", settings.wifiSsid);
     if (wifiConnectBlocking(WIFI_CONNECT_TIMEOUT_MS)) {
@@ -81,6 +67,21 @@ static void wifiBegin() {
   wifiStartAp();
 }
 
+// Non-blocking: saves credentials and starts connecting; wifiLoop() stops the
+// AP once the STA link is up. Keeps the AP alive during the attempt.
+static void wifiConnect(const char* ssid, const char* pass) {
+  if (!ssid || !ssid[0]) return;
+  strncpy(settings.wifiSsid, ssid, sizeof(settings.wifiSsid) - 1);
+  settings.wifiSsid[sizeof(settings.wifiSsid) - 1] = 0;
+  strncpy(settings.wifiPass, pass ? pass : "", sizeof(settings.wifiPass) - 1);
+  settings.wifiPass[sizeof(settings.wifiPass) - 1] = 0;
+  settingsSave();
+  if (apActive) WiFi.mode(WIFI_AP_STA); else WiFi.mode(WIFI_STA);
+  WiFi.begin(settings.wifiSsid, settings.wifiPass);
+  lastReconnectAt = millis();
+  Serial.printf("[wifi] connecting to '%s'...\n", settings.wifiSsid);
+}
+
 static void wifiForget() {
   settings.wifiSsid[0] = 0;
   settings.wifiPass[0] = 0;
@@ -91,11 +92,9 @@ static void wifiForget() {
 static void wifiLoop() {
   if (apActive) dnsServer.processNextRequest();
 
-  if (wifiOnline()) {
+  if (WiFi.status() == WL_CONNECTED) {
     if (apActive) wifiStopAp();
-    return;
-  }
-  if (!apActive && (millis() - lastReconnectAt) > WIFI_RETRY_MS) {
+  } else if (!apActive && (millis() - lastReconnectAt) > WIFI_RETRY_MS) {
     lastReconnectAt = millis();
     wifiStartAp();
   }

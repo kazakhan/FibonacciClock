@@ -6,26 +6,6 @@ project uses [Semantic Versioning](https://semver.org/).
 
 Entries are newest-first. Previous entries are never modified.
 
-## [1.3.1] - 2026-09-18
-
-### Fixed
-- **Boot WiFi connection** on ESP8266: set `WIFI_NONE_SLEEP` and maximum output
-  power before joining, which cuts association from ~30 s to a few seconds.
-- **Removed AP+STA operation.** Running the setup AP and the STA together could
-  crash the ESP8266 lwIP stack (`Exception (0)` in `lmacTxFrame`). The clock now
-  uses pure STA on boot and falls back to a pure setup AP.
-- The setup AP is only stopped once the STA has a **valid IP**, not merely a
-  connected status.
-- Offline time is now saved on the **first** successful NTP sync (and every
-  15 min), not only after 15 minutes.
-- WiFi card **Connect** now saves the credentials and reboots into a clean STA
-  connect (avoids the unstable AP+STA path).
-
-### Changed
-- `FW_VERSION` → `1.3.1`.
-- Verified on hardware: AP mode serves the full UI (`/`, `/api/state`,
-  theme CRUD, WiFi scan); theme create/update/delete works over the AP.
-
 ## [1.3.0] - 2026-09-18
 
 ### Added

@@ -526,7 +526,7 @@ async function wifiConnect(){
     const r=await fetch("/api/wifi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ssid,pass})});
     const d=await r.json();
     if(!r.ok){toast(d.error||"Failed");return;}
-    toast("Saving \u2014 rebooting to join "+ssid+"\u2026");
+    toast("Connecting to "+ssid+"\u2026");
   }catch(e){toast("Failed");}
 }
 

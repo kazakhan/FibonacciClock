@@ -313,8 +313,7 @@ static void handleTime() {
 }
 
 static void handleWifiScan() {
-  bool wasAp = apActive;
-  if (wasAp) WiFi.mode(WIFI_AP_STA);   // scanning needs the station enabled
+  if (apActive) WiFi.mode(WIFI_AP_STA);   // scanning needs STA enabled
   int n = WiFi.scanNetworks();
   JsonDocument doc;
   JsonArray arr = doc.to<JsonArray>();
@@ -329,7 +328,6 @@ static void handleWifiScan() {
 #endif
   }
   WiFi.scanDelete();
-  if (wasAp) WiFi.mode(WIFI_AP);
   String out;
   serializeJson(doc, out);
   server.send(200, "application/json", out);
@@ -345,14 +343,8 @@ static void handleWifiConnect() {
   const char* ssid = doc["ssid"] | "";
   const char* pass = doc["pass"] | "";
   if (!ssid[0]) { server.send(400, "application/json", "{\"error\":\"ssid required\"}"); return; }
-  strncpy(settings.wifiSsid, ssid, sizeof(settings.wifiSsid) - 1);
-  settings.wifiSsid[sizeof(settings.wifiSsid) - 1] = 0;
-  strncpy(settings.wifiPass, pass, sizeof(settings.wifiPass) - 1);
-  settings.wifiPass[sizeof(settings.wifiPass) - 1] = 0;
-  settingsSave();
-  server.send(200, "application/json", "{\"ok\":true,\"rebooting\":true}");
-  delay(300);
-  ESP.restart();   // reboot into a clean pure-STA connect
+  wifiConnect(ssid, pass);
+  server.send(200, "application/json", "{\"ok\":true}");
 }
 
 static void handleReboot() {

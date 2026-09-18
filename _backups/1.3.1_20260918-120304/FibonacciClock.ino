@@ -30,7 +30,6 @@
 
 static unsigned long lastNtp = 0;
 static unsigned long lastEpochSave = 0;
-static bool epochSaved = false;
 static uint8_t lastHour = 255;
 static uint8_t lastMin5 = 255;
 static bool netStarted = false;
@@ -116,7 +115,7 @@ void loop() {
   wifiLoop();
   ArduinoOTA.handle();
 
-  if (wifiOnline()) {
+  if (WiFi.status() == WL_CONNECTED) {
     if (!netStarted) {
       netStarted = true;
       MDNS.begin(settings.hostname);
@@ -125,9 +124,7 @@ void loop() {
       Serial.printf("[net] online: %s\n", WiFi.localIP().toString().c_str());
     }
     if (millis() - lastNtp > NTP_RESYNC_MS) startNtp();
-    time_t now = time(nullptr);
-    if (now > (time_t)TIME_VALID_EPOCH && (!epochSaved || millis() - lastEpochSave > EPOCH_SAVE_MS)) {
-      epochSaved = true;
+    if (millis() - lastEpochSave > EPOCH_SAVE_MS) {
       lastEpochSave = millis();
       saveEpoch();
     }

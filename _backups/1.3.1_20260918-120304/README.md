@@ -106,12 +106,6 @@ the clock starts an access point called **FibonacciClock**:
 If no WiFi/NTP is available, set the time manually (Time card) — the last known
 time is saved and restored on the next boot so the clock keeps running offline.
 
-> **Note:** on boot the clock tries the saved network once (pure STA); if it
-> can't associate within ~25 s it automatically starts the setup AP, so the web
-> UI is always reachable. A weak 2.4 GHz signal can make joining slow or
-> unreliable — the AP fallback means the clock still works. Joining uses no
-> WiFi sleep and maximum output power for the best chance of a quick connect.
-
 ---
 
 ## Web UI
