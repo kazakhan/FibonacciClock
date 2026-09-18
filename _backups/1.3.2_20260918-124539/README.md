@@ -111,10 +111,6 @@ time is saved and restored on the next boot so the clock keeps running offline.
 > UI is always reachable. A weak 2.4 GHz signal can make joining slow or
 > unreliable — the AP fallback means the clock still works. Joining uses no
 > WiFi sleep and maximum output power for the best chance of a quick connect.
->
-> While the setup AP is running the clock **retries the saved network every
-> minute** on its own (only when nobody is connected to the AP, so your session
-> isn't interrupted), and switches to WiFi automatically once it succeeds.
 
 ---
 

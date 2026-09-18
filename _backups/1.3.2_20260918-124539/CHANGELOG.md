@@ -6,20 +6,6 @@ project uses [Semantic Versioning](https://semver.org/).
 
 Entries are newest-first. Previous entries are never modified.
 
-## [1.3.2] - 2026-09-18
-
-### Added
-- **Background STA retry in AP mode.** While the setup AP is running, the clock
-  periodically (every 60 s) leaves AP mode and retries the saved network. The
-  retry only runs when **no client is connected to the AP**, so an in-use web UI
-  is never interrupted; the AP is restored if the join fails. This lets the
-  clock reconnect on its own when the network/signal recovers, without a reboot.
-
-### Changed
-- `FW_VERSION` → `1.3.2`.
-- Verified on hardware: forced-failure trace shows
-  `AP idle, retrying '…'` → `retry failed, back to AP` → `AP '…' at 192.168.4.1`.
-
 ## [1.3.1] - 2026-09-18
 
 ### Fixed

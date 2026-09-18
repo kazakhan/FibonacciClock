@@ -14,22 +14,13 @@
 // ESP8266 lwIP stack is unstable in mixed mode. On boot we try the saved
 // network (pure STA); if that fails we fall back to a setup AP with a captive
 // portal, so the clock's web UI is always reachable.
-//
-// While in AP mode we periodically retry the saved network, but only when no
-// client is connected to the AP (so an in-use UI is never interrupted). The AP
-// briefly drops during the retry and is restored if the join fails.
 
 static DNSServer dnsServer;
 static bool apActive = false;
 static unsigned long lastReconnectAt = 0;
-static bool retryActive = false;
-static unsigned long retryStartAt = 0;
-static unsigned long lastRetryAt = 0;
 
 #define WIFI_CONNECT_TIMEOUT_MS 25000UL   // normally ~3s; generous for a weak signal
 #define WIFI_RETRY_MS 60000UL             // start the setup AP if still not connected
-#define WIFI_STA_RETRY_MS 60000UL         // how often to retry the saved network in AP mode
-#define WIFI_RETRY_TIMEOUT_MS 20000UL     // give up a background retry after this long
 
 static bool wifiOnline() {
   return WiFi.status() == WL_CONNECTED && WiFi.localIP() != IPAddress(0, 0, 0, 0);
@@ -42,7 +33,6 @@ static void wifiStartAp() {
   delay(100);
   dnsServer.start(53, "*", WiFi.softAPIP());
   apActive = true;
-  lastRetryAt = millis();
   Serial.printf("[wifi] AP '%s' at %s\n", AP_NAME, WiFi.softAPIP().toString().c_str());
   clockFill(0, 0, 90);   // blue while in setup AP mode
 }
@@ -98,46 +88,14 @@ static void wifiForget() {
   WiFi.disconnect(true);
 }
 
-// Leave AP mode and try the saved network once (background, non-blocking).
-static void wifiStartStaRetry() {
-  Serial.printf("[wifi] AP idle, retrying '%s'...\n", settings.wifiSsid);
-  dnsServer.stop();
-  apActive = false;
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(settings.wifiSsid, settings.wifiPass);
-  retryActive = true;
-  retryStartAt = millis();
-}
-
 static void wifiLoop() {
-  if (apActive && !retryActive) dnsServer.processNextRequest();
+  if (apActive) dnsServer.processNextRequest();
 
   if (wifiOnline()) {
     if (apActive) wifiStopAp();
-    if (retryActive) {
-      retryActive = false;
-      Serial.printf("[wifi] joined: %s\n", WiFi.localIP().toString().c_str());
-    }
     return;
   }
-
-  if (retryActive) {
-    if (millis() - retryStartAt > WIFI_RETRY_TIMEOUT_MS) {
-      retryActive = false;
-      lastRetryAt = millis();
-      Serial.println("[wifi] retry failed, back to AP");
-      wifiStartAp();
-    }
-    return;
-  }
-
-  if (apActive) {
-    // retry only when nobody is using the setup AP
-    if (settings.wifiSsid[0] && WiFi.softAPgetStationNum() == 0 &&
-        (millis() - lastRetryAt) > WIFI_STA_RETRY_MS) {
-      wifiStartStaRetry();
-    }
-  } else if ((millis() - lastReconnectAt) > WIFI_RETRY_MS) {
+  if (!apActive && (millis() - lastReconnectAt) > WIFI_RETRY_MS) {
     lastReconnectAt = millis();
     wifiStartAp();
   }
