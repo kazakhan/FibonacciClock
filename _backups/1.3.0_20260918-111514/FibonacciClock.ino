@@ -1,15 +1,14 @@
 /*
- * KazaKhan's Fibonacci Clock
- * --------------------------
+ * Fibonacci Clock
+ * ----------------
  * ESP8266 (Wemos D1 mini) / ESP32
  * Addressable LEDs on D4, no buttons.
  *
  *   Fibonacci : 1  2  3  5   8     (fixed values)
  *   LEDs      : configurable per segment from the web UI
  *
- * The web UI is always reachable: if no WiFi is configured the clock starts an
- * access point (192.168.4.1) and serves the same page. Hourly NTP sync,
- * editable themes, OTA updates.
+ * WiFiManager config portal, hourly NTP sync, colour themes,
+ * modern responsive web UI, OTA updates.
  */
 
 #include <ArduinoOTA.h>
@@ -22,33 +21,19 @@
 #include "config.h"
 #include "themes.h"
 #include "settings.h"
-#include "themestore.h"
 #include "clock.h"
 #include "wifisetup.h"
 #include "webui.h"
 #include "webapi.h"
 
 static unsigned long lastNtp = 0;
-static unsigned long lastEpochSave = 0;
 static uint8_t lastHour = 255;
 static uint8_t lastMin5 = 255;
-static bool netStarted = false;
-
-#define EPOCH_SAVE_MS (15UL * 60UL * 1000UL)
 
 static void startNtp() {
   configTzTime(settings.tz, NTP_SERVER1, NTP_SERVER2);
   lastNtp = millis();
   Serial.printf("[ntp] sync requested (tz=%s)\n", settings.tz);
-}
-
-static void saveEpoch() {
-  time_t now = time(nullptr);
-  if (now > (time_t)TIME_VALID_EPOCH) {
-    settings.savedEpoch = (uint32_t)now;
-    settingsSave();
-    Serial.printf("[time] saved epoch %u\n", settings.savedEpoch);
-  }
 }
 
 static void setupOta() {
@@ -80,18 +65,6 @@ void setup() {
 #endif
 
   settingsLoad();
-  themesLoad();
-
-  // Restore the last known time so the clock runs without WiFi/NTP.
-  if (settings.savedEpoch > TIME_VALID_EPOCH) {
-    struct timeval tv;
-    tv.tv_sec = (time_t)settings.savedEpoch;
-    tv.tv_usec = 0;
-    settimeofday(&tv, nullptr);
-    Serial.printf("[time] restored epoch %u\n", settings.savedEpoch);
-  }
-  configTzTime(settings.tz, NTP_SERVER1, NTP_SERVER2);   // set TZ even offline
-
   clockBegin();
 
   if (settings.bootTest) {
@@ -99,38 +72,25 @@ void setup() {
   }
   clockFill(8, 0, 16);        // dim purple while connecting
 
-  wifiBegin();
+  setupWiFi();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    MDNS.begin(settings.hostname);
+    MDNS.addService("http", "tcp", 80);
+    startNtp();
+  }
 
   setupWeb();
   setupOta();
 
   applyCurrentTargets();
-  Serial.printf("[sys] ready  http://%s  (%s)\n", settings.hostname,
-                WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString().c_str()
-                                              : WiFi.softAPIP().toString().c_str());
+  Serial.printf("[sys] ready  http://%s.local  (%s)\n",
+                settings.hostname, WiFi.localIP().toString().c_str());
 }
 
 void loop() {
   server.handleClient();
-  wifiLoop();
   ArduinoOTA.handle();
-
-  if (WiFi.status() == WL_CONNECTED) {
-    if (!netStarted) {
-      netStarted = true;
-      MDNS.begin(settings.hostname);
-      MDNS.addService("http", "tcp", 80);
-      startNtp();
-      Serial.printf("[net] online: %s\n", WiFi.localIP().toString().c_str());
-    }
-    if (millis() - lastNtp > NTP_RESYNC_MS) startNtp();
-    if (millis() - lastEpochSave > EPOCH_SAVE_MS) {
-      lastEpochSave = millis();
-      saveEpoch();
-    }
-  } else {
-    netStarted = false;
-  }
 
   if (clockTestActive()) {
     clockTestTick();
@@ -157,6 +117,10 @@ void loop() {
       lastMin5 = 255;
       clockUpdateTargets(0, 0);
     }
+  }
+
+  if (WiFi.status() == WL_CONNECTED && millis() - lastNtp > NTP_RESYNC_MS) {
+    startNtp();
   }
 
   delay(2);

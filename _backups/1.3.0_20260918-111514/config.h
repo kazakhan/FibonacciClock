@@ -15,7 +15,7 @@
 
 #define AP_NAME "FibonacciClock"
 #define HOSTNAME "fibonacci-clock"
-#define FW_VERSION "1.3.0"
+#define FW_VERSION "1.2.1"
 
 #define NTP_SERVER1 "pool.ntp.org"
 #define NTP_SERVER2 "time.nist.gov"

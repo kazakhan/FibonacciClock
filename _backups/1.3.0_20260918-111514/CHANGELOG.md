@@ -6,28 +6,6 @@ project uses [Semantic Versioning](https://semver.org/).
 
 Entries are newest-first. Previous entries are never modified.
 
-## [1.3.0] - 2026-09-18
-
-### Added
-- **Editable themes**: create, edit and delete themes from the web UI (colour
-  pickers for hours/minutes/both/off + name), with **Restore defaults**.
-  Themes are stored at `/themes.json` on LittleFS.
-- **Own WiFi management** — the clock's web UI is now reachable in AP mode.
-  If no WiFi is configured (or it can't connect) the device starts the
-  **FibonacciClock** access point with a captive portal at **192.168.4.1** and
-  serves the full UI; a **WiFi card** lets you scan and join a network.
-- **Offline time**: the last known epoch is persisted (on NTP sync, manual set,
-  and every 15 min) and restored at boot so the clock runs without WiFi.
-- New API: `POST /api/themes`, `POST /api/themes/update`, `POST /api/themes/delete`,
-  `POST /api/themes/reset`, `GET /api/wifi/scan`, `POST /api/wifi`.
-
-### Changed
-- **Removed the WiFiManager dependency** (its portal owned port 80 and blocked
-  our page). WiFi credentials now live in `/config.json`.
-- `GET /api/themes` now includes `id` and `off`; `GET /api/state` adds
-  `ssid` and `wifiMode`.
-- `FW_VERSION` bumped to `1.3.0`.
-
 ## [1.2.1] - 2026-09-17
 
 ### Added

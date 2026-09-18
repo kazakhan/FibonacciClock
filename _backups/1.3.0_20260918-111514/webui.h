@@ -73,14 +73,6 @@ input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;bac
 .theme.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset,0 0 14px rgba(76,194,255,.25)}
 .bar{display:flex;height:10px;border-radius:6px;overflow:hidden;margin-bottom:6px}
 .bar i{flex:1}
-.tname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.tacts{display:flex;gap:4px;margin-top:6px;justify-content:flex-end}
-.mini{font-size:12px;line-height:1;padding:4px 7px;border-radius:8px;background:#0f151d;
-  border:1px solid var(--line);color:var(--dim);cursor:pointer}
-.mini:hover{color:var(--txt);border-color:#3a4a5e}
-.theme.new{display:flex;align-items:center;justify-content:center;color:var(--dim);min-height:70px;font-weight:600}
-.cols4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.cols4 input[type=color]{height:40px;padding:2px;cursor:pointer}
 .field{display:block;font-size:12.5px;color:var(--dim);margin:10px 0}
 .field input,.field select{width:100%;margin-top:5px;background:#0f151d;border:1px solid var(--line);color:var(--txt);
   border-radius:10px;padding:10px 11px;font-size:14px;outline:none}
@@ -183,19 +175,6 @@ footer{text-align:center;color:var(--dim);font-size:11.5px;margin-top:22px}
     </details>
 
     <details class="card acc">
-      <summary>WiFi</summary>
-      <div class="acc-body">
-        <div class="stats" id="wifiStats"></div>
-        <label class="field">Network<input id="wifissid" list="wifiscanlist" autocomplete="off" spellcheck="false"><datalist id="wifiscanlist"></datalist></label>
-        <label class="field">Password<input type="password" id="wifipass" autocomplete="off"></label>
-        <div class="btns">
-          <button id="wifiscan">Scan</button>
-          <button id="wificonnect" class="primary">Connect</button>
-        </div>
-      </div>
-    </details>
-
-    <details class="card acc">
       <summary>System</summary>
       <div class="acc-body">
         <div class="stats" id="stats"></div>
@@ -216,22 +195,6 @@ footer{text-align:center;color:var(--dim);font-size:11.5px;margin-top:22px}
 <dialog id="howtoDlg" class="howto" aria-label="How to read the clock">
   <button class="howto-x" id="howtoClose" type="button" aria-label="Close">&times;</button>
   <div id="howtoBody"></div>
-</dialog>
-<dialog id="themeDlg" class="howto" aria-label="Theme editor">
-  <button class="howto-x" id="themeClose" type="button" aria-label="Close">&times;</button>
-  <h3 id="themeTitle">Theme</h3>
-  <label class="field">Name<input id="thName" maxlength="23" autocomplete="off" spellcheck="false"></label>
-  <div class="cols4">
-    <label class="field">Hours<input type="color" id="thHour"></label>
-    <label class="field">Minutes<input type="color" id="thMinute"></label>
-    <label class="field">Both<input type="color" id="thBoth"></label>
-    <label class="field">Off<input type="color" id="thOff"></label>
-  </div>
-  <div class="btns">
-    <button id="thSave" class="primary">Save</button>
-    <button id="thDelete" class="danger">Delete</button>
-    <button id="thCancel">Cancel</button>
-  </div>
 </dialog>
 <div id="toast"></div>
 
@@ -434,7 +397,7 @@ function render(){
   }
   if(st.synced&&document.activeElement!==$("#manual"))
     $("#manual").value=String(st.hour).padStart(2,"0")+":"+String(st.minute).padStart(2,"0");
-  document.querySelectorAll("#themes .theme[data-i]").forEach(el=>el.classList.toggle("sel",+el.dataset.i===st.theme));
+  document.querySelectorAll(".theme").forEach((el,i)=>el.classList.toggle("sel",i===st.theme));
   const s=$("#stats");
   const up=st.uptime||0;
   s.innerHTML=
@@ -444,90 +407,17 @@ function render(){
     "<div><b>Free heap</b><span>"+Math.round((st.heap||0)/1024)+" KB</span></div>"+
     "<div><b>Firmware</b><span>"+(st.fw||"-")+"</span></div>"+
     "<div><b>Theme</b><span>"+(st.themeName||"-")+"</span></div>";
-  const ws=$("#wifiStats");
-  if(ws){
-    ws.innerHTML=
-      "<div><b>Mode</b><span>"+(st.wifiMode==="sta"?"Connected":"Setup AP")+"</span></div>"+
-      "<div><b>Network</b><span>"+(st.ssid||"-")+"</span></div>"+
-      "<div><b>IP</b><span>"+(st.ip||"-")+"</span></div>"+
-      "<div><b>Signal</b><span>"+(st.rssi||0)+" dBm</span></div>";
-  }
 }
-
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 function buildThemes(){
   const box=$("#themes");box.innerHTML="";
   themes.forEach((t,i)=>{
-    const d=document.createElement("div");
-    d.className="theme";d.dataset.i=i;
-    d.innerHTML='<div class="bar"><i style="background:'+t.hour+'"></i><i style="background:'+t.minute+
-      '"></i><i style="background:'+t.both+'"></i></div><div class="tname">'+esc(t.name)+
-      '</div><div class="tacts"><button class="mini" data-act="edit" title="Edit">&#9998;</button>'+
-      '<button class="mini" data-act="del" title="Delete">&times;</button></div>';
-    d.onclick=(e)=>{
-      const act=e.target.getAttribute&&e.target.getAttribute("data-act");
-      if(act==="edit")openThemeEditor(i);
-      else if(act==="del")deleteTheme(i);
-      else postConfig({theme:i});
-    };
-    box.appendChild(d);
+    const b=document.createElement("button");b.className="theme";b.type="button";
+    b.innerHTML='<div class="bar"><i style="background:'+t.hour+'"></i><i style="background:'+t.minute+
+      '"></i><i style="background:'+t.both+'"></i></div>'+t.name;
+    b.onclick=()=>postConfig({theme:i});
+    box.appendChild(b);
   });
-  const nb=document.createElement("div");
-  nb.className="theme new";nb.textContent="+ New";
-  nb.onclick=()=>openThemeEditor(-1);
-  box.appendChild(nb);
-}
-
-let editId=-1;
-function openThemeEditor(id){
-  editId=id;
-  const t=(id>=0&&themes[id])?themes[id]:{name:"New theme",hour:"#ff0a0a",minute:"#0aff0a",both:"#0a0aff",off:"#ffffff"};
-  $("#themeTitle").textContent=id>=0?"Edit theme":"New theme";
-  $("#thName").value=t.name;
-  $("#thHour").value=t.hour;$("#thMinute").value=t.minute;$("#thBoth").value=t.both;$("#thOff").value=t.off;
-  $("#thDelete").style.display=id>=0?"":"none";
-  $("#themeDlg").showModal();
-}
-async function saveTheme(){
-  const body={name:$("#thName").value.trim()||"Theme",hour:$("#thHour").value,
-    minute:$("#thMinute").value,both:$("#thBoth").value,off:$("#thOff").value};
-  const url=editId>=0?("/api/themes/update?id="+editId):"/api/themes";
-  try{
-    const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-    const d=await r.json();
-    if(!r.ok){toast(d.error||"Failed");return;}
-    themes=d;buildThemes();$("#themeDlg").close();await load();toast("Saved");
-  }catch(e){toast("Failed");}
-}
-async function deleteTheme(id){
-  if(!confirm("Delete this theme?"))return;
-  try{
-    const r=await fetch("/api/themes/delete?id="+id,{method:"POST"});
-    const d=await r.json();
-    if(!r.ok){toast(d.error||"Failed");return;}
-    themes=d;buildThemes();$("#themeDlg").close();await load();toast("Deleted");
-  }catch(e){toast("Failed");}
-}
-async function wifiScan(){
-  try{
-    const r=await fetch("/api/wifi/scan");const list=await r.json();
-    const dl=$("#wifiscanlist");dl.innerHTML="";
-    list.sort((a,b)=>b.rssi-a.rssi).forEach(n=>{
-      const o=document.createElement("option");o.value=n.ssid;o.label=n.rssi+" dBm";dl.appendChild(o);
-    });
-    toast("Found "+list.length+" networks");
-  }catch(e){toast("Scan failed");}
-}
-async function wifiConnect(){
-  const ssid=$("#wifissid").value.trim();const pass=$("#wifipass").value;
-  if(!ssid){toast("Enter a network name");return;}
-  try{
-    const r=await fetch("/api/wifi",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ssid,pass})});
-    const d=await r.json();
-    if(!r.ok){toast(d.error||"Failed");return;}
-    toast("Connecting to "+ssid+"\u2026");
-  }catch(e){toast("Failed");}
 }
 
 async function postConfig(o){
@@ -574,7 +464,7 @@ $("#sett").onclick=async()=>{
 };
 $("#reboot").onclick=async()=>{if(!confirm("Reboot the clock?"))return;
   try{await fetch("/api/reboot",{method:"POST"});}catch(e){}toast("Rebooting…");};
-$("#wifi").onclick=async()=>{if(!confirm("Forget the saved WiFi network and reboot into setup AP mode?"))return;
+$("#wifi").onclick=async()=>{if(!confirm("Erase WiFi settings and restart into the config portal?"))return;
   try{await fetch("/api/wifi/reset",{method:"POST"});}catch(e){}toast("Restarting…");};
 $("#saveseg").onclick=()=>{
   const vals=[...document.querySelectorAll("#segs input")].map(i=>parseInt(i.value,10));
@@ -588,13 +478,6 @@ $("#boottest").addEventListener("change",e=>postConfig({bootTest:e.target.checke
 $("#howto").onclick=openHowto;
 $("#howtoClose").onclick=()=>$("#howtoDlg").close();
 $("#howtoDlg").addEventListener("click",e=>{if(e.target===$("#howtoDlg"))$("#howtoDlg").close();});
-$("#thSave").onclick=saveTheme;
-$("#thDelete").onclick=()=>deleteTheme(editId);
-$("#thCancel").onclick=()=>$("#themeDlg").close();
-$("#themeClose").onclick=()=>$("#themeDlg").close();
-$("#themeDlg").addEventListener("click",e=>{if(e.target===$("#themeDlg"))$("#themeDlg").close();});
-$("#wifiscan").onclick=wifiScan;
-$("#wificonnect").onclick=wifiConnect;
 
 buildSegInputs();
 buildTzSelect();

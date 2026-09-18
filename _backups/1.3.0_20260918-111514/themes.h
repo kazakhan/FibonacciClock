@@ -3,22 +3,16 @@
 
 struct ThemeColor { uint8_t r, g, b; };
 
-#define THEME_NAME_LEN 24
-#define MAX_THEMES 40
-
-// Runtime theme (editable, persisted to /themes.json).
 struct Theme {
-  char name[THEME_NAME_LEN];
-  ThemeColor off, hour, minute, both;
-};
-
-// Compile-time defaults used to seed / restore the theme store.
-struct ThemeDef {
   const char* name;
-  ThemeColor off, hour, minute, both;
+  ThemeColor off;
+  ThemeColor hour;
+  ThemeColor minute;
+  ThemeColor both;
 };
 
-static const ThemeDef DEFAULT_THEME_DEFS[] = {
+static const Theme THEMES[] = {
+  // ---- classic set from the original sketch ----
   {"RGB",        {255, 255, 255},       {255, 10, 10},   {10, 255, 10},   {10, 10, 255}},
   {"Mondrian",   {255, 255, 255},       {255, 10, 10},   {248, 222, 0},   {10, 10, 255}},
   {"Basbrun",    {255, 255, 255},       {80, 40, 0},     {20, 200, 20},   {255, 100, 10}},
@@ -29,6 +23,7 @@ static const ThemeDef DEFAULT_THEME_DEFS[] = {
   {"Warm",       {255, 255, 255},       {237, 20, 20},   {246, 243, 54},  {255, 126, 21}},
   {"Earth",      {255, 255, 255},       {70, 35, 0},     {70, 122, 10},   {200, 182, 0}},
   {"Dark",       {255, 255, 255},       {211, 34, 34},   {80, 151, 78},   {16, 24, 149}},
+  // ---- additional themes ----
   {"Aurora",     {255, 255, 255},       {0, 255, 170},   {0, 120, 255},   {180, 0, 255}},
   {"Sunset",     {255, 255, 255},       {255, 94, 0},    {255, 196, 0},   {200, 0, 120}},
   {"Ocean",      {255, 255, 255},       {0, 180, 255},   {0, 255, 200},   {0, 80, 255}},
@@ -43,4 +38,4 @@ static const ThemeDef DEFAULT_THEME_DEFS[] = {
   {"Amber",      {255, 255, 255},       {255, 191, 0},   {255, 111, 0},   {255, 255, 0}},
 };
 
-static const uint8_t DEFAULT_THEME_COUNT = sizeof(DEFAULT_THEME_DEFS) / sizeof(DEFAULT_THEME_DEFS[0]);
+static const uint8_t THEME_COUNT = sizeof(THEMES) / sizeof(THEMES[0]);

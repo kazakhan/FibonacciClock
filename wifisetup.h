@@ -1,114 +1,101 @@
 #pragma once
-#include <WiFiManager.h>
+#include <Arduino.h>
+#include <DNSServer.h>
+#ifdef ESP32
+  #include <WiFi.h>
+#else
+  #include <ESP8266WiFi.h>
+#endif
 #include "config.h"
 #include "settings.h"
 #include "clock.h"
 
-// All strings handed to WiFiManager are kept in RAM (non-const static arrays).
-// On ESP8266, flash-resident strings can land at unaligned addresses and the
-// library reads them with word-wide loads, which faults with a LoadStoreError.
-static char WM_HEAD_HTML[] =
-  "<style>"
-  "body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;}"
-  ".wrap{max-width:420px;margin:0 auto;}"
-  "h1{letter-spacing:.3px;}"
-  "button,input[type=submit]{border-radius:10px!important;}"
-  "input,select{border-radius:10px!important;}"
-  "</style>";
+// Own WiFi management: connect with saved credentials, otherwise start an
+// access point (with a captive-portal DNS) so the clock's web UI is always
+// reachable. No WiFiManager portal — our own server owns port 80.
 
-static char WM_MENU_HTML[] =
-  "<div style='font-size:12px;opacity:.65;padding:6px 2px'>"
-  "Fibonacci Clock " FW_VERSION "</div>";
+static DNSServer dnsServer;
+static bool apActive = false;
+static unsigned long lastReconnectAt = 0;
 
-static char WM_ID_TZ[] = "tz";
-static char WM_LABEL_TZ[] = "Timezone (POSIX TZ)";
-static char WM_ID_THEME[] = "theme";
-static char WM_LABEL_THEME[] = "Theme number";
-static char WM_ID_BRIGHT[] = "bright";
-static char WM_LABEL_BRIGHT[] = "Brightness";
-static char WM_CUSTOM_BRIGHT[] = "type=\"range\" min=\"0\" max=\"255\"";
-static char WM_INFO_HTML[] =
-  "<p style='opacity:.7;font-size:13px;margin-top:8px'>After connecting, open the "
-  "clock page to pick themes visually.</p>";
+#define WIFI_CONNECT_TIMEOUT_MS 15000UL
+#define WIFI_RETRY_MS 30000UL
 
-static WiFiManager wm;
-static WiFiManagerParameter* pTz = nullptr;
-static WiFiManagerParameter* pTheme = nullptr;
-static WiFiManagerParameter* pBright = nullptr;
-
-static void wmApplySettings() {
-  settingsSave();
-  clockSetBrightness(settings.brightness);
+static void wifiStartAp() {
+  if (apActive) return;
+  if (WiFi.getMode() != WIFI_AP_STA) WiFi.mode(WIFI_AP);
+  WiFi.softAP(AP_NAME);
+  delay(100);
+  dnsServer.start(53, "*", WiFi.softAPIP());
+  apActive = true;
+  Serial.printf("[wifi] AP '%s' at %s\n", AP_NAME, WiFi.softAPIP().toString().c_str());
+  clockFill(0, 0, 90);   // blue while in setup AP mode
 }
 
-// Called after the portal saves the custom parameters.
-// Empty fields are ignored so that a plain WiFi-only save does not wipe them.
-static void wmSaveParams() {
-  if (pTz) {
-    const char* v = pTz->getValue();
-    if (v && v[0]) {
-      strncpy(settings.tz, v, sizeof(settings.tz) - 1);
-      settings.tz[sizeof(settings.tz) - 1] = 0;
-    }
-  }
-  if (pTheme) {
-    const char* v = pTheme->getValue();
-    if (v && v[0]) {
-      int x = atoi(v);
-      settings.theme = (x < 0 || x >= THEME_COUNT) ? 0 : (uint8_t)x;
-    }
-  }
-  if (pBright) {
-    const char* v = pBright->getValue();
-    if (v && v[0]) {
-      int x = atoi(v);
-      settings.brightness = (uint8_t)constrain(x, 0, 255);
-    }
-  }
-  wmApplySettings();
-  if (settings.tz[0]) configTzTime(settings.tz, NTP_SERVER1, NTP_SERVER2);
-  Serial.println("[wm] params saved");
+static void wifiStopAp() {
+  if (!apActive) return;
+  dnsServer.stop();
+  WiFi.softAPdisconnect(true);
+  apActive = false;
+  WiFi.mode(WIFI_STA);
+  Serial.println("[wifi] AP stopped");
 }
 
-static void wmApCallback(WiFiManager* m) {
-  (void)m;
-  static bool reported = false;
-  if (reported) return;
-  reported = true;
-  Serial.println("[wm] config portal started");
-  clockFill(0, 0, 90);   // blue while the portal is open
+static bool wifiConnectBlocking(uint32_t timeoutMs) {
+  if (settings.wifiSsid[0] == 0) return false;
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(settings.wifiSsid, settings.wifiPass);
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && (millis() - start) < timeoutMs) {
+    delay(200);
+    yield();
+  }
+  return WiFi.status() == WL_CONNECTED;
 }
 
-static void setupWiFi() {
-  wm.setDebugOutput(false);
-  wm.setTitle("Fibonacci Clock");
-  wm.setDarkMode(true);
-  wm.setHostname(settings.hostname);
-  wm.setConfigPortalTimeout(300);
-  wm.setMinimumSignalQuality(10);
-  wm.setAPCallback(wmApCallback);
-  wm.setSaveParamsCallback(wmSaveParams);
-  wm.setCustomHeadElement(WM_HEAD_HTML);
-  wm.setCustomMenuHTML(WM_MENU_HTML);
-
-  static char themeBuf[4];
-  static char brightBuf[4];
-  snprintf(themeBuf, sizeof(themeBuf), "%u", settings.theme);
-  snprintf(brightBuf, sizeof(brightBuf), "%u", settings.brightness);
-
-  pTz = new WiFiManagerParameter(WM_ID_TZ, WM_LABEL_TZ, settings.tz, sizeof(settings.tz) - 1);
-  pTheme = new WiFiManagerParameter(WM_ID_THEME, WM_LABEL_THEME, themeBuf, 3);
-  pBright = new WiFiManagerParameter(WM_ID_BRIGHT, WM_LABEL_BRIGHT, brightBuf, 3,
-                                     WM_CUSTOM_BRIGHT);
-  wm.addParameter(pTz);
-  wm.addParameter(pTheme);
-  wm.addParameter(pBright);
-  wm.addParameter(new WiFiManagerParameter(WM_INFO_HTML));
-
-  Serial.println("[wm] connecting...");
-  if (!wm.autoConnect(AP_NAME)) {
-    Serial.println("[wm] failed / timed out, continuing offline");
+static void wifiBegin() {
+  if (settings.wifiSsid[0]) {
+    Serial.printf("[wifi] connecting to '%s'...\n", settings.wifiSsid);
+    if (wifiConnectBlocking(WIFI_CONNECT_TIMEOUT_MS)) {
+      Serial.printf("[wifi] connected: %s\n", WiFi.localIP().toString().c_str());
+      return;
+    }
+    Serial.println("[wifi] connect failed");
   } else {
-    Serial.printf("[wm] connected: %s\n", WiFi.localIP().toString().c_str());
+    Serial.println("[wifi] no saved network");
+  }
+  wifiStartAp();
+}
+
+// Non-blocking: saves credentials and starts connecting; wifiLoop() stops the
+// AP once the STA link is up. Keeps the AP alive during the attempt.
+static void wifiConnect(const char* ssid, const char* pass) {
+  if (!ssid || !ssid[0]) return;
+  strncpy(settings.wifiSsid, ssid, sizeof(settings.wifiSsid) - 1);
+  settings.wifiSsid[sizeof(settings.wifiSsid) - 1] = 0;
+  strncpy(settings.wifiPass, pass ? pass : "", sizeof(settings.wifiPass) - 1);
+  settings.wifiPass[sizeof(settings.wifiPass) - 1] = 0;
+  settingsSave();
+  if (apActive) WiFi.mode(WIFI_AP_STA); else WiFi.mode(WIFI_STA);
+  WiFi.begin(settings.wifiSsid, settings.wifiPass);
+  lastReconnectAt = millis();
+  Serial.printf("[wifi] connecting to '%s'...\n", settings.wifiSsid);
+}
+
+static void wifiForget() {
+  settings.wifiSsid[0] = 0;
+  settings.wifiPass[0] = 0;
+  settingsSave();
+  WiFi.disconnect(true);
+}
+
+static void wifiLoop() {
+  if (apActive) dnsServer.processNextRequest();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    if (apActive) wifiStopAp();
+  } else if (!apActive && (millis() - lastReconnectAt) > WIFI_RETRY_MS) {
+    lastReconnectAt = millis();
+    wifiStartAp();
   }
 }

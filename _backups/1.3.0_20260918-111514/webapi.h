@@ -18,7 +18,6 @@
 
 #include "config.h"
 #include "themes.h"
-#include "themestore.h"
 #include "settings.h"
 #include "clock.h"
 #include "wifisetup.h"
@@ -55,8 +54,7 @@ static void sendState() {
     minMask = valueToMask(t.tm_min / 5);
   }
 
-  const Theme& th = activeTheme();
-  bool sta = (WiFi.status() == WL_CONNECTED);
+  const Theme& th = THEMES[settings.theme % THEME_COUNT];
 
   JsonDocument doc;
   doc["synced"] = synced;
@@ -82,10 +80,8 @@ static void sendState() {
   for (uint8_t i = 0; i < SEG_COUNT; i++) seg.add(settings.segCount[i]);
   doc["tz"] = settings.tz;
   doc["name"] = settings.hostname;
-  doc["ip"] = sta ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
-  doc["ssid"] = sta ? WiFi.SSID() : String(AP_NAME);
-  doc["rssi"] = sta ? WiFi.RSSI() : 0;
-  doc["wifiMode"] = sta ? "sta" : (apActive ? "ap" : "off");
+  doc["ip"] = WiFi.localIP().toString();
+  doc["rssi"] = WiFi.RSSI();
   doc["uptime"] = millis() / 1000;
   doc["heap"] = ESP.getFreeHeap();
   doc["fw"] = FW_VERSION;
@@ -105,84 +101,19 @@ static void handleRoot() {
   server.send_P(200, "text/html", INDEX_HTML);
 }
 
-static void sendThemes() {
+static void handleThemes() {
   JsonDocument doc;
   JsonArray arr = doc.to<JsonArray>();
-  for (uint8_t i = 0; i < gThemeCount; i++) {
+  for (uint8_t i = 0; i < THEME_COUNT; i++) {
     JsonObject o = arr.add<JsonObject>();
-    o["id"] = i;
-    o["name"] = gThemes[i].name;
-    o["off"] = colorHex(gThemes[i].off);
-    o["hour"] = colorHex(gThemes[i].hour);
-    o["minute"] = colorHex(gThemes[i].minute);
-    o["both"] = colorHex(gThemes[i].both);
+    o["name"] = THEMES[i].name;
+    o["hour"] = colorHex(THEMES[i].hour);
+    o["minute"] = colorHex(THEMES[i].minute);
+    o["both"] = colorHex(THEMES[i].both);
   }
   String out;
   serializeJson(doc, out);
   server.send(200, "application/json", out);
-}
-
-static bool parseThemeColors(JsonDocument& doc, ThemeColor& off, ThemeColor& hour,
-                             ThemeColor& minute, ThemeColor& both) {
-  if (!parseHexColor(doc["off"] | "#ffffff", off)) return false;
-  if (!parseHexColor(doc["hour"] | "#ff0000", hour)) return false;
-  if (!parseHexColor(doc["minute"] | "#00ff00", minute)) return false;
-  if (!parseHexColor(doc["both"] | "#0000ff", both)) return false;
-  return true;
-}
-
-static void handleThemeCreate() {
-  if (!server.hasArg("plain")) { server.send(400, "application/json", "{\"error\":\"no body\"}"); return; }
-  JsonDocument doc;
-  if (deserializeJson(doc, server.arg("plain"))) {
-    server.send(400, "application/json", "{\"error\":\"bad json\"}");
-    return;
-  }
-  ThemeColor off, hour, minute, both;
-  if (!parseThemeColors(doc, off, hour, minute, both)) {
-    server.send(400, "application/json", "{\"error\":\"bad colour\"}");
-    return;
-  }
-  int id = themesAdd(doc["name"] | "Theme", off, hour, minute, both);
-  if (id < 0) { server.send(400, "application/json", "{\"error\":\"theme limit reached\"}"); return; }
-  sendThemes();
-}
-
-static void handleThemeUpdate() {
-  int id = server.arg("id").toInt();
-  if (!server.hasArg("plain")) { server.send(400, "application/json", "{\"error\":\"no body\"}"); return; }
-  JsonDocument doc;
-  if (deserializeJson(doc, server.arg("plain"))) {
-    server.send(400, "application/json", "{\"error\":\"bad json\"}");
-    return;
-  }
-  ThemeColor off, hour, minute, both;
-  if (!parseThemeColors(doc, off, hour, minute, both)) {
-    server.send(400, "application/json", "{\"error\":\"bad colour\"}");
-    return;
-  }
-  if (!themesUpdate((uint8_t)id, doc["name"] | "Theme", off, hour, minute, both)) {
-    server.send(400, "application/json", "{\"error\":\"bad theme id\"}");
-    return;
-  }
-  clockForceRefresh = true;
-  sendThemes();
-}
-
-static void handleThemeDelete() {
-  int id = server.arg("id").toInt();
-  if (!themesDelete((uint8_t)id)) {
-    server.send(400, "application/json", "{\"error\":\"cannot delete (last theme?)\"}");
-    return;
-  }
-  clockForceRefresh = true;
-  sendThemes();
-}
-
-static void handleThemeReset() {
-  themesReset();
-  clockForceRefresh = true;
-  sendThemes();
 }
 
 static void handleConfig() {
@@ -195,7 +126,7 @@ static void handleConfig() {
 
   if (!doc["theme"].isNull()) {
     int v = doc["theme"];
-    settings.theme = (v < 0 || v >= gThemeCount) ? 0 : (uint8_t)v;
+    settings.theme = (v < 0 || v >= THEME_COUNT) ? 0 : (uint8_t)v;
   }
   if (!doc["brightness"].isNull()) {
     settings.brightness = (uint8_t)constrain((int)doc["brightness"], 0, 255);
@@ -304,47 +235,9 @@ static void handleTime() {
   tv.tv_sec = epoch;
   tv.tv_usec = 0;
   settimeofday(&tv, nullptr);
-
-  settings.savedEpoch = (uint32_t)epoch;   // survive a power cycle
-  settingsSave();
   applyCurrentTargets();
 
   sendState();
-}
-
-static void handleWifiScan() {
-  if (apActive) WiFi.mode(WIFI_AP_STA);   // scanning needs STA enabled
-  int n = WiFi.scanNetworks();
-  JsonDocument doc;
-  JsonArray arr = doc.to<JsonArray>();
-  for (int i = 0; i < n; i++) {
-    JsonObject o = arr.add<JsonObject>();
-    o["ssid"] = WiFi.SSID(i);
-    o["rssi"] = WiFi.RSSI(i);
-#ifdef ESP32
-    o["open"] = (WiFi.encryptionType(i) == WIFI_AUTH_OPEN);
-#else
-    o["open"] = (WiFi.encryptionType(i) == ENC_TYPE_NONE);
-#endif
-  }
-  WiFi.scanDelete();
-  String out;
-  serializeJson(doc, out);
-  server.send(200, "application/json", out);
-}
-
-static void handleWifiConnect() {
-  if (!server.hasArg("plain")) { server.send(400, "application/json", "{\"error\":\"no body\"}"); return; }
-  JsonDocument doc;
-  if (deserializeJson(doc, server.arg("plain"))) {
-    server.send(400, "application/json", "{\"error\":\"bad json\"}");
-    return;
-  }
-  const char* ssid = doc["ssid"] | "";
-  const char* pass = doc["pass"] | "";
-  if (!ssid[0]) { server.send(400, "application/json", "{\"error\":\"ssid required\"}"); return; }
-  wifiConnect(ssid, pass);
-  server.send(200, "application/json", "{\"ok\":true}");
 }
 
 static void handleReboot() {
@@ -356,7 +249,7 @@ static void handleReboot() {
 static void handleWifiReset() {
   server.send(200, "application/json", "{\"ok\":true}");
   delay(200);
-  wifiForget();
+  wm.resetSettings();
   delay(200);
   ESP.restart();
 }
@@ -364,17 +257,11 @@ static void handleWifiReset() {
 static void setupWeb() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/api/state", HTTP_GET, sendState);
-  server.on("/api/themes", HTTP_GET, sendThemes);
-  server.on("/api/themes", HTTP_POST, handleThemeCreate);
-  server.on("/api/themes/update", HTTP_POST, handleThemeUpdate);
-  server.on("/api/themes/delete", HTTP_POST, handleThemeDelete);
-  server.on("/api/themes/reset", HTTP_POST, handleThemeReset);
+  server.on("/api/themes", HTTP_GET, handleThemes);
   server.on("/api/config", HTTP_POST, handleConfig);
   server.on("/api/test", HTTP_GET, handleTest);
   server.on("/api/test", HTTP_POST, handleTest);
   server.on("/api/time", HTTP_POST, handleTime);
-  server.on("/api/wifi/scan", HTTP_GET, handleWifiScan);
-  server.on("/api/wifi", HTTP_POST, handleWifiConnect);
   server.on("/api/reboot", HTTP_POST, handleReboot);
   server.on("/api/wifi/reset", HTTP_POST, handleWifiReset);
   httpUpdater.setup(&server);

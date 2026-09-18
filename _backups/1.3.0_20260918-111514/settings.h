@@ -13,9 +13,6 @@ struct Settings {
   uint8_t segCount[SEG_COUNT];
   char tz[64];
   char hostname[32];
-  char wifiSsid[33];
-  char wifiPass[65];
-  uint32_t savedEpoch;
 };
 
 static Settings settings;
@@ -45,9 +42,6 @@ static void settingsDefaults() {
   settings.tz[sizeof(settings.tz) - 1] = 0;
   strncpy(settings.hostname, HOSTNAME, sizeof(settings.hostname) - 1);
   settings.hostname[sizeof(settings.hostname) - 1] = 0;
-  settings.wifiSsid[0] = 0;
-  settings.wifiPass[0] = 0;
-  settings.savedEpoch = 0;
 }
 
 static void settingsSave();
@@ -83,7 +77,8 @@ static void settingsLoad() {
     return;
   }
 
-  settings.theme = doc["theme"] | DEFAULT_THEME;
+  uint8_t th = doc["theme"] | DEFAULT_THEME;
+  settings.theme = (th < THEME_COUNT) ? th : 0;
   settings.brightness = doc["brightness"] | DEFAULT_BRIGHTNESS;
   settings.on = doc["on"] | true;
   settings.bootTest = doc["bootTest"] | DEFAULT_BOOT_TEST;
@@ -103,14 +98,6 @@ static void settingsLoad() {
   const char* hn = doc["hostname"] | HOSTNAME;
   strncpy(settings.hostname, hn, sizeof(settings.hostname) - 1);
   settings.hostname[sizeof(settings.hostname) - 1] = 0;
-
-  const char* ws = doc["wifiSsid"] | "";
-  strncpy(settings.wifiSsid, ws, sizeof(settings.wifiSsid) - 1);
-  settings.wifiSsid[sizeof(settings.wifiSsid) - 1] = 0;
-  const char* wp = doc["wifiPass"] | "";
-  strncpy(settings.wifiPass, wp, sizeof(settings.wifiPass) - 1);
-  settings.wifiPass[sizeof(settings.wifiPass) - 1] = 0;
-  settings.savedEpoch = doc["savedEpoch"] | 0;
 
   // Guard against a corrupted/empty config (e.g. after a failed portal save).
   if (settings.tz[0] == 0 || settings.hostname[0] == 0 || !settingsValidSegments()) {
@@ -135,9 +122,6 @@ static void settingsSave() {
   for (uint8_t i = 0; i < SEG_COUNT; i++) seg.add(settings.segCount[i]);
   doc["tz"] = settings.tz;
   doc["hostname"] = settings.hostname;
-  doc["wifiSsid"] = settings.wifiSsid;
-  doc["wifiPass"] = settings.wifiPass;
-  doc["savedEpoch"] = settings.savedEpoch;
 
   File f = LittleFS.open("/config.json", "w");
   if (!f) {

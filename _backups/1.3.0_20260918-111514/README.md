@@ -1,10 +1,9 @@
 # KazaKhan's Fibonacci Clock
 
 A WiFi-connected **Fibonacci clock** built on an ESP8266 (Wemos D1 mini) or
-ESP32, driving a WS2812/NeoPixel strip. Hourly NTP sync, editable colour themes,
-OTA updates, and a fast, responsive web UI that explains itself. **WiFi is
-optional** — with no network configured it starts its own access point and serves
-the same page, so you can use and configure the clock from any phone.
+ESP32, driving a WS2812/NeoPixel strip. It has a WiFiManager setup portal, hourly
+NTP sync, 22 colour themes, OTA updates, and a fast, responsive web UI that
+explains itself.
 
 ![KazaKhan's Fibonacci Clock](images/logo.png)
 
@@ -40,19 +39,13 @@ clock) that shows this using the colours and time that are live right now.
 ## Features
 
 - ESP8266 **and** ESP32 support.
-- **WiFi is optional**: connect to your network, or use the built-in **setup AP**
-  (`FibonacciClock` → `http://192.168.4.1`) with the full web UI and a WiFi card
-  to scan/join networks later. No buttons.
+- **WiFiManager** setup portal (customised, dark, branded) — no buttons needed.
 - **Hourly NTP** sync with a selectable timezone (~32 zones).
-- **Editable themes**: create, edit and delete themes (with colour pickers),
-  plus a one-click **Restore defaults**. 22 built in (RGB, Mondrian, 80s,
-  Pastel, Neon, Cyberpunk, …), off blocks lit white.
-- **Offline time**: the last known time is persisted and restored, so the clock
-  keeps running without WiFi.
+- **22 themes** (RGB, Mondrian, 80s, Pastel, Neon, Cyberpunk, …), off blocks lit white.
 - **Runtime-configurable LEDs per segment** with a live 5-square preview.
 - **Segment chase test** on boot (toggleable) and on demand.
 - **OTA** updates (ArduinoOTA and a browser `/update` page).
-- Settings and themes persisted to LittleFS.
+- Settings persisted to LittleFS.
 - Fast, responsive, self-contained web page (no CDN, no filesystem upload).
 
 ---
@@ -77,6 +70,7 @@ LEDs in each is whatever your build uses; set it in the web UI.
 ### Arduino IDE
 1. Install the **ESP8266** (or **ESP32**) board support in Boards Manager.
 2. Install these libraries via Library Manager:
+   - **WiFiManager** (tzapu)
    - **Adafruit NeoPixel**
    - **ArduinoJson** (v7)
 3. Open `FibonacciClock.ino`.
@@ -91,20 +85,17 @@ servers, default timezone, `MAX_LEDS`, block values).
 
 ---
 
-## First-time WiFi setup (optional)
+## First-time WiFi setup
 
-WiFi is not required. On first boot (or if the saved network can't be reached)
-the clock starts an access point called **FibonacciClock**:
+On first boot (or after a WiFi reset) the clock starts an access point called
+**FibonacciClock**:
 
 1. Join the `FibonacciClock` WiFi network from a phone/laptop.
-2. Open **http://192.168.4.1** (a captive-portal popup usually appears).
-3. The **whole clock UI works here** — set themes, LED counts, brightness, time.
-4. To join a network, open the **WiFi** card, tap **Scan**, pick your network,
-   enter the password and **Connect**. Once it connects, the setup AP stops.
-5. The clock is then at **http://fibonacci-clock.local** or its DHCP IP.
+2. Open **http://192.168.4.1**.
+3. Enter your WiFi SSID/password and save. The clock reboots and connects.
+4. Find it at **http://fibonacci-clock.local** or its DHCP IP address.
 
-If no WiFi/NTP is available, set the time manually (Time card) — the last known
-time is saved and restored on the next boot so the clock keeps running offline.
+The portal also lets you set the timezone, theme number and brightness.
 
 ---
 
@@ -112,37 +103,27 @@ time is saved and restored on the next boot so the clock keeps running offline.
 
 - **Clock** — the live 5-square rendering, the time, the current hour/minute
   breakdown, and **How to read this?** (also a hover tooltip).
-- **Display** — power, brightness, and the theme grid. Each theme has **✎ edit**
-  and **× delete** actions, plus a **+ New** tile that opens the theme editor
-  (name + colour pickers). **Restore defaults** brings back the 22 built-ins.
+- **Display** — power, brightness, theme picker.
 - **LED layout** — LED count for each Fibonacci segment, live total, "test
   segments on boot" toggle, **Save layout**, **Test segments**.
 - **Time** — timezone dropdown (saves instantly) and a time-only manual setter.
-- **WiFi** — status, **Scan**, network name + password, **Connect**.
-- **System** — IP, signal, uptime, heap, firmware version; **Reboot**, **Forget
+- **System** — IP, signal, uptime, heap, firmware version; **Reboot**, **Reset
   WiFi**, and **Firmware update** (upload a `.bin`).
 
 ### HTTP API
 
 | Method | Path | Body / query | Purpose |
 |---|---|---|---|
-| GET | `/api/state` | — | Time, masks, colours, WiFi status, settings |
-| GET | `/api/themes` | — | Theme list (`id`, `name`, colours) |
-| POST | `/api/themes` | `{name,off,hour,minute,both}` | Create a theme |
-| POST | `/api/themes/update?id=N` | same | Edit theme `N` |
-| POST | `/api/themes/delete?id=N` | — | Delete theme `N` |
-| POST | `/api/themes/reset` | — | Restore the default themes |
+| GET | `/api/state` | — | Current time, masks, colours, settings |
+| GET | `/api/themes` | — | Theme list with colours |
 | POST | `/api/config` | `{theme, brightness, on, bootTest, tz, seg:[5]}` | Update settings |
 | POST | `/api/time` | `{hour, min}` | Set the time (keeps the date) |
 | POST | `/api/test?mode=segments` | — | Run the segment chase |
-| GET | `/api/wifi/scan` | — | Scan for networks |
-| POST | `/api/wifi` | `{ssid, pass}` | Join a network |
 | POST | `/api/reboot` | — | Reboot |
-| POST | `/api/wifi/reset` | — | Forget WiFi and reboot into setup AP |
+| POST | `/api/wifi/reset` | — | Erase WiFi settings and reboot to the portal |
 | POST | `/update` | multipart `firmware` | OTA firmware upload |
 
-Settings live in `/config.json` and themes in `/themes.json` on LittleFS; both
-survive reboots and reflashes.
+Settings live in `/config.json` on LittleFS and survive reboots and reflashes.
 
 ---
 
@@ -151,11 +132,10 @@ survive reboots and reflashes.
 ```
 FibonacciClock.ino   main: setup/loop, NTP, orchestration
 config.h             pins, LED limits, block values, defaults, version
-themes.h             theme structs + default themes
-themestore.h         runtime theme store (load/save/CRUD) -> /themes.json
-settings.h           LittleFS load/save/validate -> /config.json
+themes.h             the 22 colour themes
+settings.h           LittleFS load/save/validate
 clock.h              NeoPixel output, Fibonacci mapping, fades, segment test
-wifisetup.h          own WiFi manager + setup AP + captive portal
+wifisetup.h          WiFiManager customisation
 webapi.h             HTTP routes and handlers
 webui.h              embedded HTML/CSS/JS (the web page)
 CHANGELOG.md         version history

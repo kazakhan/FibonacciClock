@@ -3,7 +3,6 @@
 #include "config.h"
 #include "themes.h"
 #include "settings.h"
-#include "themestore.h"
 
 static Adafruit_NeoPixel strip(MAX_LEDS, LED_PIN, LED_TYPE);
 
@@ -81,7 +80,7 @@ static void clockUpdateTargets(uint8_t hour24, uint8_t minute) {
   uint8_t hourMask = valueToMask(h12);
   uint8_t minMask = valueToMask(minute / 5);
 
-  const Theme& t = activeTheme();
+  const Theme& t = THEMES[settings.theme % THEME_COUNT];
 
   for (uint8_t b = 0; b < SEG_COUNT; b++) {
     bool hA = hourMask & (1 << b);
