@@ -242,8 +242,8 @@ let SEG=[1,1,3,7,12];
 const NS="http://www.w3.org/2000/svg";
 // Classic 8x5 Fibonacci tiling. Index = block (bit position).
 const SQUARES=[
-  {x:2,y:0,w:1,h:1},   // block 0 - value 1  (top-middle)
-  {x:2,y:1,w:1,h:1},   // block 1 - value 1  (below it)
+  {x:2,y:1,w:1,h:1},   // block 0 - value 1  (lower 1)
+  {x:2,y:0,w:1,h:1},   // block 1 - value 1  (upper 1)
   {x:0,y:0,w:2,h:2},   // block 2 - value 2  (top-left)
   {x:0,y:2,w:3,h:3},   // block 3 - value 3  (bottom-left)
   {x:3,y:0,w:5,h:5},   // block 4 - value 5  (right, full height)

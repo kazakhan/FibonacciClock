@@ -6,6 +6,17 @@ project uses [Semantic Versioning](https://semver.org/).
 
 Entries are newest-first. Previous entries are never modified.
 
+## [1.3.3] - 2026-09-26
+
+### Fixed
+- **Web preview:** swapped the two single (value-1) squares so the on-page
+  layout matches the physical clock. Preview-only change — the segment
+  addressing and the LED output are unchanged (the physical clock was already
+  correct).
+
+### Changed
+- `FW_VERSION` → `1.3.3`.
+
 ## [1.3.2] - 2026-09-18
 
 ### Added
