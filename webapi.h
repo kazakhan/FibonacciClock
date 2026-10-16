@@ -73,6 +73,8 @@ static void sendState() {
   doc["theme"] = settings.theme;
   doc["themeName"] = th.name;
   doc["brightness"] = settings.brightness;
+  doc["colorOrder"] = settings.colorOrder;
+  doc["colorOrderName"] = LED_ORDER_NAMES[settings.colorOrder % COLOR_ORDER_COUNT];
   doc["on"] = settings.on;
   doc["bootTest"] = settings.bootTest;
   doc["test"] = clockTestActive();
@@ -200,6 +202,14 @@ static void handleConfig() {
   if (!doc["brightness"].isNull()) {
     settings.brightness = (uint8_t)constrain((int)doc["brightness"], 0, 255);
   }
+  bool colorOrderChanged = false;
+  if (!doc["colorOrder"].isNull()) {
+    int v = doc["colorOrder"];
+    if (v >= 0 && v < COLOR_ORDER_COUNT && v != settings.colorOrder) {
+      settings.colorOrder = (uint8_t)v;
+      colorOrderChanged = true;
+    }
+  }
   if (!doc["on"].isNull()) {
     settings.on = (bool)doc["on"];
   }
@@ -253,6 +263,7 @@ static void handleConfig() {
     clockForceRefresh = true;
   }
   clockSetBrightness(settings.brightness);   // applies immediately (setBrightness + push)
+  if (colorOrderChanged) clockSetColorOrder(settings.colorOrder);
   applyCurrentTargets();
 
   sendState();

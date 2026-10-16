@@ -11,11 +11,15 @@
 #endif
 
 #define MAX_LEDS 100             // strip buffer allocation (runtime total <= this)
-#define LED_TYPE (NEO_GRB + NEO_KHZ800)   // WLED / WS2812B default. Use NEO_RGB if wrong.
+#define LED_TYPE (NEO_GRB + NEO_KHZ800)   // constructor default; overridden at runtime
+
+// Runtime-selectable RGB colour order (see clock.h LED_ORDERS).
+#define COLOR_ORDER_COUNT 6
+#define DEFAULT_COLOR_ORDER 2            // GRB (WLED / typical WS2812B)
 
 #define AP_NAME "FibonacciClock"
 #define HOSTNAME "fibonacci-clock"
-#define FW_VERSION "1.3.3"
+#define FW_VERSION "1.4.0"
 
 #define NTP_SERVER1 "pool.ntp.org"
 #define NTP_SERVER2 "time.nist.gov"

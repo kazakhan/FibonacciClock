@@ -8,6 +8,7 @@
 struct Settings {
   uint8_t theme;
   uint8_t brightness;
+  uint8_t colorOrder;
   bool on;
   bool bootTest;
   uint8_t segCount[SEG_COUNT];
@@ -38,6 +39,7 @@ static bool settingsValidSegments() {
 static void settingsDefaults() {
   settings.theme = DEFAULT_THEME;
   settings.brightness = DEFAULT_BRIGHTNESS;
+  settings.colorOrder = DEFAULT_COLOR_ORDER;
   settings.on = true;
   settings.bootTest = DEFAULT_BOOT_TEST;
   for (uint8_t i = 0; i < SEG_COUNT; i++) settings.segCount[i] = DEFAULT_SEG_COUNTS[i];
@@ -85,6 +87,8 @@ static void settingsLoad() {
 
   settings.theme = doc["theme"] | DEFAULT_THEME;
   settings.brightness = doc["brightness"] | DEFAULT_BRIGHTNESS;
+  settings.colorOrder = doc["colorOrder"] | DEFAULT_COLOR_ORDER;
+  if (settings.colorOrder >= COLOR_ORDER_COUNT) settings.colorOrder = DEFAULT_COLOR_ORDER;
   settings.on = doc["on"] | true;
   settings.bootTest = doc["bootTest"] | DEFAULT_BOOT_TEST;
 
@@ -129,6 +133,7 @@ static void settingsSave() {
   JsonDocument doc;
   doc["theme"] = settings.theme;
   doc["brightness"] = settings.brightness;
+  doc["colorOrder"] = settings.colorOrder;
   doc["on"] = settings.on;
   doc["bootTest"] = settings.bootTest;
   JsonArray seg = doc["seg"].to<JsonArray>();

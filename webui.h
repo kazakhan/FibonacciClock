@@ -53,6 +53,9 @@ h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.2px}
 .rep{color:var(--dim);font-size:12.5px;text-align:center;min-height:18px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:7px 0}
 .row>span{font-size:14px}
+.row select{background:#0f151d;border:1px solid var(--line);color:var(--txt);border-radius:10px;
+  padding:8px 10px;font-size:14px;outline:none;max-width:58%}
+.hint{font-size:11.5px;color:var(--dim);margin:-2px 0 6px}
 input[type=range]{-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;background:var(--line);
   width:58%;outline:none}
 input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
@@ -153,6 +156,8 @@ footer{text-align:center;color:var(--dim);font-size:11.5px;margin-top:22px}
           <label class="switch"><input type="checkbox" id="on"><span></span></label>
         </div>
         <div class="row"><span>Brightness</span><input type="range" id="bright" min="0" max="255"></div>
+        <div class="row"><span>Colour order</span><select id="colorOrder"></select></div>
+        <div class="hint">If red and green look swapped, try RGB or GRB.</div>
         <h2>Theme</h2>
         <div class="themes" id="themes"></div>
       </div>
@@ -238,6 +243,7 @@ footer{text-align:center;color:var(--dim);font-size:11.5px;margin-top:22px}
 <script>
 const $=s=>document.querySelector(s);
 const FIB=[1,1,2,3,5];
+const ORDERS=["RGB","RBG","GRB","GBR","BRG","BGR"];
 let SEG=[1,1,3,7,12];
 const NS="http://www.w3.org/2000/svg";
 // Classic 8x5 Fibonacci tiling. Index = block (bit position).
@@ -344,6 +350,15 @@ function buildTzSelect(){
   });
 }
 
+function buildOrderSelect(){
+  const sel=$("#colorOrder");sel.innerHTML="";
+  ORDERS.forEach((n,i)=>{
+    const o=document.createElement("option");
+    o.value=i;o.textContent=n;
+    sel.appendChild(o);
+  });
+}
+
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");
   clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),1800);}
 
@@ -426,6 +441,7 @@ function render(){
   $("#hostline").textContent=(st.name||"fibonacci-clock")+".local  •  "+(st.ip||"offline");
   $("#on").checked=!!st.on;
   if(document.activeElement!==$("#bright"))$("#bright").value=st.brightness??0;
+  if(document.activeElement!==$("#colorOrder"))$("#colorOrder").value=st.colorOrder??2;
   const sel=$("#tz");
   if(sel.value!==st.tz){
     let opt=[...sel.options].find(o=>o.value===st.tz);
@@ -561,6 +577,7 @@ $("#bright").addEventListener("input",e=>{
 });
 $("#bright").addEventListener("change",e=>postConfig({brightness:+e.target.value}));
 $("#tz").addEventListener("change",e=>postConfig({tz:e.target.value}));
+$("#colorOrder").addEventListener("change",e=>postConfig({colorOrder:+e.target.value}));
 $("#sett").onclick=async()=>{
   const v=$("#manual").value;if(!v){toast("Pick a time");return;}
   const [h,m]=v.split(":").map(Number);
@@ -598,6 +615,7 @@ $("#wificonnect").onclick=wifiConnect;
 
 buildSegInputs();
 buildTzSelect();
+buildOrderSelect();
 buildFace();
 load();
 setInterval(load,1000);

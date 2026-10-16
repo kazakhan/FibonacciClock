@@ -10,6 +10,19 @@ static Adafruit_NeoPixel strip(MAX_LEDS, LED_PIN, LED_TYPE);
 static uint8_t curR[MAX_LEDS], curG[MAX_LEDS], curB[MAX_LEDS];
 static uint8_t tgtR[MAX_LEDS], tgtG[MAX_LEDS], tgtB[MAX_LEDS];
 
+// Runtime-selectable RGB colour orders (index -> Adafruit NeoPixel type).
+static const neoPixelType LED_ORDERS[COLOR_ORDER_COUNT] = {
+  NEO_RGB + NEO_KHZ800,
+  NEO_RBG + NEO_KHZ800,
+  NEO_GRB + NEO_KHZ800,
+  NEO_GBR + NEO_KHZ800,
+  NEO_BRG + NEO_KHZ800,
+  NEO_BGR + NEO_KHZ800,
+};
+static const char* LED_ORDER_NAMES[COLOR_ORDER_COUNT] = {
+  "RGB", "RBG", "GRB", "GBR", "BRG", "BGR"
+};
+
 // Runtime segment layout, derived from settings.segCount[].
 static uint16_t segStarts[SEG_COUNT];
 static uint8_t segCounts[SEG_COUNT];
@@ -63,6 +76,7 @@ static void clockRebuild() {
 
 static void clockBegin() {
   strip.begin();
+  strip.updateType(LED_ORDERS[settings.colorOrder % COLOR_ORDER_COUNT]);
   strip.setBrightness(settings.brightness);
   clockRebuild();
 }
@@ -72,6 +86,15 @@ static void clockPush() {
     strip.setPixelColor(i, curR[i], curG[i], curB[i]);
   }
   strip.show();
+}
+
+// Change the RGB colour order at runtime and redraw the current frame.
+static void clockSetColorOrder(uint8_t idx) {
+  if (idx >= COLOR_ORDER_COUNT) idx = DEFAULT_COLOR_ORDER;
+  strip.updateType(LED_ORDERS[idx]);
+  strip.setBrightness(settings.brightness);
+  clockPush();
+  Serial.printf("[led] colour order %u (%s)\n", idx, LED_ORDER_NAMES[idx]);
 }
 
 // Compute the target colors for the given local time.

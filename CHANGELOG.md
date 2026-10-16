@@ -6,6 +6,19 @@ project uses [Semantic Versioning](https://semver.org/).
 
 Entries are newest-first. Previous entries are never modified.
 
+## [1.4.0] - 2026-10-17
+
+### Added
+- **Colour-order selector** in the dashboard (Display card). Choose between
+  **RGB, RBG, GRB, GBR, BRG, BGR** at runtime — fixes strips where red and green
+  (or other channels) are swapped. Default is **GRB**. Applied immediately via
+  `Adafruit_NeoPixel::updateType()` and persisted to `/config.json`.
+- `GET /api/state` now reports `colorOrder` / `colorOrderName`; `POST /api/config`
+  accepts `{colorOrder: 0..5}`.
+
+### Changed
+- `FW_VERSION` → `1.4.0`.
+
 ## [1.3.3] - 2026-09-26
 
 ### Fixed
